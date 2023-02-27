@@ -24,23 +24,22 @@ f_list = os.listdir()
 
 # --- Cargo Imagen ------------------------------------------
 plt.close('all')
-I = cv2.imread(f_list[2]) 
+I = cv2.imread(f_list[4]) 
 I = cv2.cvtColor(I, cv2.COLOR_BGR2RGB)
 imshow(I)
 
 h, w = I.shape[:2]
 
-# Cambiar el tamaño de la imagen a la mitad
-img_resized = cv2.resize(I, (1200,800 ))
+# Cambiar el tamaño de la imagen a la mitad - ¿Qué resize conviene? 
+img_resized = cv2.resize(I, (1200,800 )) - #mantener relación de aspecto - todas sacadas en la misma resolución, llevar todo a HD. 
 
 # Mostrar la imagen redimensionada
 imshow(img_resized)
 
 
-
 #--- Paso a escalas de grises ------------------------------
 Ig = cv2.cvtColor(img_resized, cv2.COLOR_RGB2GRAY)
-imshow(Ig)
+# imshow(Ig)
 
 # --- Binarizo ---------------------------------------------
 th, Ibw = cv2.threshold(Ig, 120, 255, cv2.THRESH_BINARY)    
@@ -48,7 +47,7 @@ th, Ibw = cv2.threshold(Ig, 120, 255, cv2.THRESH_BINARY)
 
 # --- Invierto ---------------------------------------------
 inverted_image = cv2.bitwise_not(Ibw)
-# imshow(inverted_image)
+imshow(inverted_image)
 
 
 
@@ -57,27 +56,21 @@ connectivity = 8
 num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(inverted_image, connectivity, cv2.CV_32S)  
 imshow(labels)
 
-#----- Reviso cada
-
 # La posición x del borde superior izquierdo del componente conectado (cv2.CC_STAT_LEFT)
 # La posición y del borde superior izquierdo del componente conectado (cv2.CC_STAT_TOP)
 # El ancho del componente conectado (cv2.CC_STAT_WIDTH)
 # La altura del componente conectado (cv2.CC_STAT_HEIGHT)
 # El área del componente conectado (cv2.CC_STAT_AREA)
 
-print('----------Código----------')
 
+# --- Reviso componentes ------------------------------------------
 
-stats[150,:]
-stats[152,:]
-stats[154,:]
-stats[216,:]
+stats[36,:]
+stats[60,:]
+stats[61,:]
+stats[62,:]
 
-print('----------Barras----------')
-
-stats[218,:]
-stats[219,:]
-stats[221,:]
+#hacerlo relativo al ancho y alto de la imagen 
 
 # --- Filtro por altura, ancho y area ---------------------------------------------------------------
 Ibw_filtalt = inverted_image.copy()
@@ -85,7 +78,7 @@ for jj in range(1,num_labels):
     if (stats[jj, cv2.CC_STAT_HEIGHT]<60) or (stats[jj, cv2.CC_STAT_HEIGHT]>90):
         Ibw_filtalt[labels ==jj] = 0
 for jj in range(1,num_labels):
-    if (stats[jj, cv2.CC_STAT_WIDTH]<5) or (stats[jj, cv2.CC_STAT_WIDTH]>40):
+    if (stats[jj, cv2.CC_STAT_WIDTH]<20) or (stats[jj, cv2.CC_STAT_WIDTH]>40):
         Ibw_filtalt[labels==jj] = 0
 for jj in range(1,num_labels):
     if (stats[jj, cv2.CC_STAT_AREA]<500) or (stats[jj, cv2.CC_STAT_AREA]>1500):
@@ -104,11 +97,16 @@ num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(blurred,
 imshow(labels)
 
 
+#meter filtro de mayor area para que sólo quede un componente 
+
+#distancia entre centroides 
+
+
 #----------- Creo una máscara utilizando los datos de stats para el código que ahora es 1 solo componente conectado -------
 
 
 # Obtén los valores de la caja delimitadora del componente conectado específico
-component_id = 154 # hay que encontrar la manera de que sea el unico componente
+component_id = 2 # hay que encontrar la manera de que sea el unico componente
 left = stats[component_id, cv2.CC_STAT_LEFT]
 top = stats[component_id, cv2.CC_STAT_TOP]
 width = stats[component_id, cv2.CC_STAT_WIDTH]
@@ -137,7 +135,7 @@ mask = cv2.inRange(mask, lower, upper)
 
 # --- Invierto ---------------------------------------------
 inverted_mask = cv2.bitwise_not(mask)
-imshow(inverted_mask)
+# imshow(inverted_mask)
 
 
 # Aplica la máscara ROI a la imagen original para obtener la ROI correspondiente
@@ -177,12 +175,11 @@ kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
 
 # Aplicar erosión
 erosion = cv2.erode(thresh, kernel, iterations = 1)
-# imshow(erosion)
+imshow(erosion)
 
 # --- Invierto ---------------------------------------------
 inverted_image2 = cv2.bitwise_not(erosion)
 imshow(inverted_image2)
-
 
 
 # Encuentra los bordes de la imagen recortada
@@ -208,13 +205,22 @@ rotated = cv2.warpAffine(cropped_img, M, (cols, rows))
 imshow(rotated)
 
 
-text = pytesseract.image_to_string(cropped_img)
+# thickness skeleton 
+
+
+text = pytesseract.image_to_string(rotated)
 # text = pytesseract.image_to_string(I)
 print(text)
 tokens = text.split()
 print(tokens)
 
-for token in tokens:
-    if len(token) == 13:
-        print(token.upper())
+# for token in tokens:
+#     if len(token) == 13:
+#         print(token.upper())
+
+#subconjunto de imagenes buenas
+#train vs test
+#conjunto más heavy + análisis 
+#qué se podría mejorar 
+
 
