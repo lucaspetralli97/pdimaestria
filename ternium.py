@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+np.set_printoptions(suppress=True)
 import matplotlib.pyplot as plt
 import pytesseract
 import os
@@ -28,17 +29,19 @@ I = cv2.imread(f_list[4])
 I = cv2.cvtColor(I, cv2.COLOR_BGR2RGB)
 imshow(I)
 
-h, w = I.shape[:2]
+#----------- Llevo a un mismo tamaño ----------------
 
-# Cambiar el tamaño de la imagen a la mitad - ¿Qué resize conviene? 
-img_resized = cv2.resize(I, (1200,800 )) - #mantener relación de aspecto - todas sacadas en la misma resolución, llevar todo a HD. 
+# h, w = I.shape[:2]
 
-# Mostrar la imagen redimensionada
-imshow(img_resized)
+# # Cambiar el tamaño de la imagen a la mitad - ¿Qué resize conviene? 
+# img_resized = cv2.resize(I, (1200,800 )) #mantener relación de aspecto - todas sacadas en la misma resolución, llevar todo a HD. 
+
+# # Mostrar la imagen redimensionada
+# imshow(img_resized)
 
 
 #--- Paso a escalas de grises ------------------------------
-Ig = cv2.cvtColor(img_resized, cv2.COLOR_RGB2GRAY)
+Ig = cv2.cvtColor(I, cv2.COLOR_RGB2GRAY)
 # imshow(Ig)
 
 # --- Binarizo ---------------------------------------------
@@ -56,6 +59,7 @@ connectivity = 8
 num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(inverted_image, connectivity, cv2.CV_32S)  
 imshow(labels)
 
+
 # La posición x del borde superior izquierdo del componente conectado (cv2.CC_STAT_LEFT)
 # La posición y del borde superior izquierdo del componente conectado (cv2.CC_STAT_TOP)
 # El ancho del componente conectado (cv2.CC_STAT_WIDTH)
@@ -65,36 +69,111 @@ imshow(labels)
 
 # --- Reviso componentes ------------------------------------------
 
-stats[36,:]
-stats[60,:]
-stats[61,:]
-stats[62,:]
+def get_component_stats(labels, stats, labels_of_interest):
+    
+    idx = labels_of_interest[0]  
+    min_width, min_height, min_area = stats[idx, cv2.CC_STAT_WIDTH], stats[idx, cv2.CC_STAT_HEIGHT], stats[idx, cv2.CC_STAT_AREA]
+    max_width, max_height, max_area = min_width, min_height, min_area
+
+    for label in labels_of_interest[1:]:
+       
+        min_width = min(min_width, stats[label, cv2.CC_STAT_WIDTH])
+        min_height = min(min_height, stats[label, cv2.CC_STAT_HEIGHT])
+        min_area = min(min_area, stats[label, cv2.CC_STAT_AREA])
+        max_width = max(max_width, stats[label, cv2.CC_STAT_WIDTH])
+        max_height = max(max_height, stats[label, cv2.CC_STAT_HEIGHT])
+        max_area = max(max_area, stats[label, cv2.CC_STAT_AREA])
+
+    return (min_width, min_height, min_area), (max_width, max_height, max_area)
+
+
+labels_of_interest = [68,66,64,61,57,52,48,45,43,42,41,40,39]
+
+r = get_component_stats(labels, stats, labels_of_interest)
+
+
+
+min_width  = r[0][0]
+max_withd   = r[1][0]
+min_height = r[0][1]
+max_height = r[1][1]
+min_area   = r[0][2]
+max_area   = r[1][2]
+
 
 #hacerlo relativo al ancho y alto de la imagen 
 
 # --- Filtro por altura, ancho y area ---------------------------------------------------------------
 Ibw_filtalt = inverted_image.copy()
+
 for jj in range(1,num_labels):
-    if (stats[jj, cv2.CC_STAT_HEIGHT]<60) or (stats[jj, cv2.CC_STAT_HEIGHT]>90):
-        Ibw_filtalt[labels ==jj] = 0
-for jj in range(1,num_labels):
-    if (stats[jj, cv2.CC_STAT_WIDTH]<20) or (stats[jj, cv2.CC_STAT_WIDTH]>40):
+    if (stats[jj, cv2.CC_STAT_WIDTH]<min_width) or (stats[jj, cv2.CC_STAT_WIDTH]>max_withd):
         Ibw_filtalt[labels==jj] = 0
 for jj in range(1,num_labels):
-    if (stats[jj, cv2.CC_STAT_AREA]<500) or (stats[jj, cv2.CC_STAT_AREA]>1500):
+    if (stats[jj, cv2.CC_STAT_HEIGHT]<min_height) or (stats[jj, cv2.CC_STAT_HEIGHT]>max_height):
+        Ibw_filtalt[labels ==jj] = 0
+for jj in range(1,num_labels):
+    if (stats[jj, cv2.CC_STAT_AREA]<min_area) or (stats[jj, cv2.CC_STAT_AREA]>max_area):
+        Ibw_filtalt[labels==jj] = 0
+
+imshow(Ibw_filtalt)
+
+# --- Filtro por altura, ancho y area ---------------------------------------------------------------
+Ibw_filtalt = inverted_image.copy()
+
+
+h, w = I.shape[:2]
+
+for jj in range(1,num_labels):
+    if (stats[jj, cv2.CC_STAT_WIDTH]<w * 0.011) or (stats[jj, cv2.CC_STAT_WIDTH]>w * 0.040):
+        Ibw_filtalt[labels==jj] = 0
+for jj in range(1,num_labels):
+    if (stats[jj, cv2.CC_STAT_HEIGHT]<h * 0.060) or (stats[jj, cv2.CC_STAT_HEIGHT]>h * 0.074):
+        Ibw_filtalt[labels ==jj] = 0
+for jj in range(1,num_labels):
+    if (stats[jj, cv2.CC_STAT_AREA]<(h*w) * 0.00065) or (stats[jj, cv2.CC_STAT_AREA]>(h*w) * 0.0015):
         Ibw_filtalt[labels==jj] = 0
 
 
 imshow(Ibw_filtalt)
 
-# ------- Aplica filtro gaussiano --------------
-blurred = cv2.GaussianBlur(Ibw_filtalt, (25, 25), 0)
-imshow(blurred)
+# calculando los rangos para cada filtro como % de la altura y ancho de la imagen para evitar usar el resize
+
+h, w = I.shape[:2]
+
+w * 0.066
+
+min_width / w #1,2% #1,5%
+max_withd / w #2,1% #3,8%
+min_height / h #6,7% #6,1%
+max_height / h #7,3 #6,8%
+min_area / (h*w)  #  #0.065
+max_area / (h*w) #  #0.1429
+
+(h*w) * 0.00065
+
+
+
+# # ------- Aplica filtro gaussiano --------------
+# blurred = cv2.GaussianBlur(Ibw_filtalt, (31, 31), 0)
+# imshow(blurred)
 
 #--- Elementos conectados ---------------------------------
 connectivity = 8
-num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(blurred, connectivity, cv2.CV_32S)  
+num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(Ibw_filtalt, connectivity, cv2.CV_32S)  
 imshow(labels)
+
+# ----------- Calculamos la mediana de los centroides para filtar ruido -----------
+
+type(centroids)
+
+# calcular la mediana de cada columna 
+column_medians = np.median(centroids, axis=0)
+
+# imprimir los resultados
+print("La mediana de la primera columna es:", column_medians[0])
+print("La mediana de la segunda columna es:", column_medians[1])
+
 
 
 #meter filtro de mayor area para que sólo quede un componente 
@@ -208,7 +287,7 @@ imshow(rotated)
 # thickness skeleton 
 
 
-text = pytesseract.image_to_string(rotated)
+text = pytesseract.image_to_string(Ibw_filtalt)
 # text = pytesseract.image_to_string(I)
 print(text)
 tokens = text.split()
